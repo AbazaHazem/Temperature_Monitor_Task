@@ -1,34 +1,32 @@
+#include "scheduler.h"
 #include <stdio.h>
-#include <stdint.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #define MAX_TASKS 10
-#define SAMPLE_INTERVAL_US 100
-
-typedef void (*TaskFunction)(void);
 
 typedef struct {
     TaskFunction task;
     uint32_t executionTimeRemaining;
     uint32_t periodUs;
+    uint32_t onStartTimeUs;
+    uint32_t onEndTimeUs;
 } Task;
 
-Task scheduler[MAX_TASKS] = {0};
-uint8_t taskCount = 0;
+static Task scheduler[MAX_TASKS] = {0};
+static uint8_t taskCount = 0;
 
-void addTask(TaskFunction task, uint32_t periodUs) {
-    if (periodUs == 0) {
-        printf("Error: Task period cannot be zero.\n");
+void addTask(TaskFunction task, uint32_t periodUs, uint32_t onStartTimeUs, uint32_t onEndTimeUs) {
+    if (periodUs == 0 || onEndTimeUs <= onStartTimeUs || taskCount >= MAX_TASKS) {
+        printf("Error: Invalid task parameters or task limit reached.\n");
         return;
     }
-    if (taskCount < MAX_TASKS) {
-        scheduler[taskCount].task = task;
-        scheduler[taskCount].executionTimeRemaining = periodUs;
-        scheduler[taskCount].periodUs = periodUs;
-        taskCount++;
-    } else {
-        printf("Task limit reached.\n");
-    }
+    scheduler[taskCount].task = task;
+    scheduler[taskCount].executionTimeRemaining = 0;  // Start immediately on first cycle
+    scheduler[taskCount].periodUs = periodUs;
+    scheduler[taskCount].onStartTimeUs = onStartTimeUs;
+    scheduler[taskCount].onEndTimeUs = onEndTimeUs;
+    taskCount++;
 }
 
 void removeTask(TaskFunction task) {
@@ -42,18 +40,28 @@ void removeTask(TaskFunction task) {
             return;
         }
     }
-    printf("Task not found.\n");
+    printf("Error: Task not found.\n");
 }
 
 void timePartitionScheduler(void) {
+    uint32_t currentTime = 0;
+
     while (1) {
         for (uint8_t i = 0; i < taskCount; i++) {
             if (scheduler[i].executionTimeRemaining == 0) {
-                scheduler[i].task();
+                uint32_t currentMicroTime = currentTime % scheduler[i].periodUs;
+
+                if (currentMicroTime >= scheduler[i].onStartTimeUs && currentMicroTime < scheduler[i].onEndTimeUs) {
+                    scheduler[i].task();
+                }
+
                 scheduler[i].executionTimeRemaining = scheduler[i].periodUs;
             }
+
             scheduler[i].executionTimeRemaining -= SAMPLE_INTERVAL_US;
         }
+
         usleep(SAMPLE_INTERVAL_US);
+        currentTime += SAMPLE_INTERVAL_US;
     }
 }
