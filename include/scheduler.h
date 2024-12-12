@@ -8,14 +8,9 @@
 
 typedef void (*TaskFunction)(void);
 
-typedef struct {
-    TaskFunction task;
-    uint32_t executionTimeRemaining;
-    uint32_t periodUs;
-} Task;
-
-void addTask(TaskFunction task, uint32_t periodUs);
+void addTask(TaskFunction task, uint32_t periodUs, uint32_t onStartTimeUs, uint32_t onEndTimeUs);
 void removeTask(TaskFunction task);
 void timePartitionScheduler(void);
 
 #endif // SCHEDULER_H
+
